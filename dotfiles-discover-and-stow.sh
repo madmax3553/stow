@@ -13,6 +13,26 @@ echo ""
 declare -a root_configs
 declare -a config_items
 
+IGNORE_FILE="$DOTFILES/.stowignore"
+declare -a STOW_IGNORE=()
+if [ -f "$IGNORE_FILE" ]; then
+    mapfile -t STOW_IGNORE < <(sed -e 's/#.*//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e '/^$/d' "$IGNORE_FILE")
+fi
+
+is_ignored() {
+    local candidate="$1"
+    for ignored in "${STOW_IGNORE[@]}"; do
+        if [[ "$candidate" == "$ignored" ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+if [ ${#STOW_IGNORE[@]} -gt 0 ]; then
+    echo "Using ignore list from $IGNORE_FILE"
+fi
+
 # Check root-level dotfiles
 for item in ~/.*; do
     basename=$(basename "$item")
@@ -31,6 +51,7 @@ for item in ~/.*; do
     [[ "$basename" == ".viminfo" ]] && continue
     [[ "$basename" == ".wget-hsts" ]] && continue
     [[ "$basename" == ".pulse-cookie" ]] && continue
+    is_ignored "$basename" && continue
     
     # Skip if already a symlink to dotfiles
     if [ -L "$item" ]; then
@@ -65,6 +86,9 @@ if [ -d ~/.config ]; then
         
         # Skip if already in dotfiles
         [ -d "$DOTFILES/$basename/.config/$basename" ] && continue
+
+        # Skip if ignored
+        is_ignored ".config/$basename" && continue
         
         # Add to list
         config_items+=("$item")
